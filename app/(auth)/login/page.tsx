@@ -3,10 +3,11 @@ import { login, signup } from './actions'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string; mode?: string }>
+  searchParams: Promise<{ error?: string; message?: string; mode?: string; next?: string }>
 }) {
   const params = await searchParams
   const isSignup = params.mode === 'signup'
+  const next = params.next ?? ''
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
@@ -33,6 +34,7 @@ export default async function LoginPage({
         )}
 
         <form action={isSignup ? signup : login} className="space-y-4">
+          <input type="hidden" name="next" value={next} />
           {isSignup && (
             <Field label="Nombre del hogar (opcional)">
               <input
@@ -75,9 +77,9 @@ export default async function LoginPage({
 
         <p className="mt-4 text-center text-sm text-[var(--muted)]">
           {isSignup ? (
-            <>¿Ya tenés cuenta? <a href="/login" className="underline">Iniciá sesión</a></>
+            <>¿Ya tenés cuenta? <a href={`/login${next ? `?next=${encodeURIComponent(next)}` : ''}`} className="underline">Iniciá sesión</a></>
           ) : (
-            <>¿Primera vez? <a href="/login?mode=signup" className="underline">Creá tu cuenta</a></>
+            <>¿Primera vez? <a href={`/login?mode=signup${next ? `&next=${encodeURIComponent(next)}` : ''}`} className="underline">Creá tu cuenta</a></>
           )}
         </p>
       </div>

@@ -3,6 +3,8 @@ import { MonthSummaryCards } from '@/components/month-summary-cards'
 import { CategoryBreakdown } from '@/components/category-breakdown'
 import { RecentTransactions } from '@/components/recent-transactions'
 import type { TransactionWithCategory } from '@/lib/types'
+import Link from 'next/link'
+import { Users } from 'lucide-react'
 
 // Server Component: trae el mes actual y delega el render a client components
 // más chicos (así los gráficos, que necesitan interactividad, se hidratan
@@ -32,11 +34,16 @@ export default async function DashboardPage() {
 
   return (
     <main className="content-width px-4 py-6 sm:px-6 sm:py-10">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {now.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })}
-        </h1>
-        <p className="text-sm text-[var(--muted)]">Resumen del mes en curso</p>
+      <header className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {now.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })}
+          </h1>
+          <p className="text-sm text-[var(--muted)]">Resumen del mes en curso</p>
+        </div>
+        <Link href="/household" aria-label="Tu hogar" style={{ color: 'var(--muted)' }}>
+          <Users size={22} />
+        </Link>
       </header>
 
       <MonthSummaryCards income={totalIncome} expenses={totalExpenses} />
