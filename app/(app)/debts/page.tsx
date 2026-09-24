@@ -63,8 +63,8 @@ function NewDebtForm() {
     >
       <p className="text-sm font-medium">Nueva deuda</p>
       <p className="text-xs text-[var(--muted)]">
-        Se registra como un ingreso (categoría "Deuda") por el monto total — así tu balance refleja el
-        dinero que recibiste. Cada pago que registres después se resta como gasto.
+        Se guarda aparte, igual que las metas de ahorro — no genera movimientos ni afecta tu balance o tus
+        reportes, es solo un seguimiento de cuánto debés y cuánto vas pagando.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <input
