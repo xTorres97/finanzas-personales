@@ -53,7 +53,7 @@ export default async function DebtsPage({
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
-          No tenés deudas cargadas.
+          No tienes deudas cargadas.
         </p>
       ) : (
         <div className="space-y-4">
@@ -74,10 +74,6 @@ function NewDebtForm() {
       style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
     >
       <p className="text-sm font-medium">Nueva deuda</p>
-      <p className="text-xs text-[var(--muted)]">
-        Se guarda aparte, igual que las metas de ahorro — no genera movimientos ni afecta tu balance o tus
-        reportes, es solo un seguimiento de cuánto debés y cuánto vas pagando.
-      </p>
       <div className="flex flex-wrap items-end gap-3">
         <input
           name="name"

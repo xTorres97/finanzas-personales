@@ -117,7 +117,7 @@ export default async function SavingsPage() {
 
       {categoryIds.length === 0 || (depositRows.length === 0 && withdrawalRows.length === 0) ? (
         <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
-          Todavía no tenés movimientos en categorías de ahorro. Marcá una (o creá una nueva) desde Categorías.
+          Todavía no tienes movimientos en categorías de ahorro. Marcá una (o creá una nueva) desde Categorías.
         </p>
       ) : (
         <>

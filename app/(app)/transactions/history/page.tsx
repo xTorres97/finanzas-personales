@@ -42,7 +42,7 @@ export default async function TransactionsHistoryPage({
           ← Volver a Movimientos
         </a>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{heading}</h1>
-        <p className="text-sm text-[var(--muted)]">Solo consulta — para cargar un movimiento nuevo, volvé a Movimientos.</p>
+        <p className="text-sm text-[var(--muted)]">Solo consulta, para cargar un movimiento nuevo, vuelve a Movimientos.</p>
       </header>
 
       {rows.length === 0 ? (
