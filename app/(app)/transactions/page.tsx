@@ -8,21 +8,40 @@ import type { Category, Subcategory, TransactionWithCategory } from '@/lib/types
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; from?: string; to?: string; label?: string; all?: string }>
 }) {
-  const { error } = await searchParams
+  const { error, from, to, label, all } = await searchParams
   const householdId = await getHouseholdId()
   const supabase = await createClient()
+
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const currentMonthLabel = now.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })
+
+  const showAll = all === '1'
+  const hasCustomRange = Boolean(from && to)
+
+  let query = supabase
+    .from('transactions')
+    .select('*, categories(name, type, color)')
+    .eq('household_id', householdId ?? '')
+    .order('date', { ascending: false })
+
+  let heading = `Historial de ${currentMonthLabel}`
+  if (showAll) {
+    heading = 'Historial completo'
+  } else if (hasCustomRange) {
+    query = query.gte('date', from!).lte('date', to!)
+    heading = label ? `Movimientos de ${label}` : 'Movimientos del período'
+  } else {
+    query = query.gte('date', startOfMonth).lte('date', endOfMonth)
+  }
 
   const [{ data: categories }, { data: subcategories }, { data: transactions }] = await Promise.all([
     supabase.from('categories').select('*').eq('household_id', householdId ?? '').order('type').order('sort_order'),
     supabase.from('subcategories').select('*').order('sort_order'),
-    supabase
-      .from('transactions')
-      .select('*, categories(name, type, color)')
-      .eq('household_id', householdId ?? '')
-      .order('date', { ascending: false })
-      .returns<TransactionWithCategory[]>(),
+    query.returns<TransactionWithCategory[]>(),
   ])
 
   const cats: Category[] = categories ?? []
@@ -33,7 +52,7 @@ export default async function TransactionsPage({
     <main className="content-width px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Movimientos</h1>
-        <p className="text-sm text-[var(--muted)]">Cargá y revisá todos tus ingresos y gastos.</p>
+        <p className="text-sm text-[var(--muted)]">Cargá tus ingresos y gastos. Para meses anteriores, mirá Reportes.</p>
       </header>
 
       {error && (
@@ -53,10 +72,21 @@ export default async function TransactionsPage({
       )}
 
       <section>
-        <h2 className="mb-3 text-lg font-medium">Historial</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-medium">{heading}</h2>
+          {showAll || hasCustomRange ? (
+            <a href="/transactions" className="text-xs underline" style={{ color: 'var(--muted)' }}>
+              Ver solo este mes
+            </a>
+          ) : (
+            <a href="/transactions?all=1" className="text-xs underline" style={{ color: 'var(--muted)' }}>
+              Ver historial completo
+            </a>
+          )}
+        </div>
         {rows.length === 0 ? (
           <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
-            Todavía no cargaste ningún movimiento.
+            No hay movimientos en este período.
           </p>
         ) : (
           <ul className="divide-y overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>

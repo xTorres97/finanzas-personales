@@ -149,6 +149,15 @@ export default async function ReportsPage({
         ) : (
           <>
             <AnnualSummaryCards income={income} expenses={expenses} />
+            <div className="mt-4">
+              <a
+                href={`/transactions?from=${from}&to=${to}&label=${encodeURIComponent(rangeLabel)}`}
+                className="inline-block rounded-lg border px-4 py-2 text-sm font-medium"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                Ver movimientos de este período →
+              </a>
+            </div>
             <div className="mt-6">
               <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Gastos por categoría</h3>
               <CategoryBreakdown transactions={rows} />
