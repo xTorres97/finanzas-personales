@@ -38,7 +38,7 @@ export function GoalCelebration({ goalName }: { goalName: string }) {
       <p className="relative text-sm font-semibold" style={{ color: 'var(--cyan)' }}>
         🎉 ¡Bien hecho! Meta lograda 🎉
       </p>
-      <p className="relative text-xs text-[var(--muted)]">Completaste &quot;{goalName}&quot; — ¡una menos!</p>
+      <p className="relative text-xs text-[var(--muted)]">Completaste &quot;{goalName}&quot; — ¡FELICIDADES!</p>
 
       <style jsx>{`
         .confetti-piece {
