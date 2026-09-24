@@ -9,6 +9,25 @@ export interface Category {
   icon: string | null
   color: string | null
   sort_order: number
+  is_savings: boolean
+  is_debt: boolean
+}
+
+export interface Debt {
+  id: string
+  household_id: string
+  name: string
+  principal_amount: number
+  currency: CurrencyCode
+  due_date: string | null
+  created_at: string
+}
+
+export interface DebtPayment {
+  id: string
+  debt_id: string
+  amount: number
+  created_at: string
 }
 
 export interface Subcategory {

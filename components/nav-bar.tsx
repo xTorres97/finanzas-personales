@@ -2,15 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tags, BarChart3, PiggyBank, LogOut } from 'lucide-react'
-import { logout } from '@/app/(app)/actions'
+import { LayoutDashboard, ArrowLeftRight, Tags, BarChart3, MoreHorizontal } from 'lucide-react'
 
 const items = [
   { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
   { href: '/transactions', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/categories', label: 'Categorías', icon: Tags },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
-  { href: '/goals', label: 'Metas', icon: PiggyBank },
+  { href: '/more', label: 'Más', icon: MoreHorizontal },
 ]
 
 export function NavBar() {
@@ -41,18 +40,6 @@ export function NavBar() {
             </li>
           )
         })}
-        <li className="flex-1">
-          <form action={logout}>
-            <button
-              type="submit"
-              className="flex w-full flex-col items-center gap-0.5 py-2 text-[11px]"
-              style={{ color: 'var(--expense)' }}
-            >
-              <LogOut size={20} />
-              Salir
-            </button>
-          </form>
-        </li>
       </ul>
     </nav>
   )
