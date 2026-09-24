@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 
@@ -41,6 +42,11 @@ export async function deleteDebt(formData: FormData) {
   if (!id) return
 
   const supabase = await createClient()
-  await supabase.from('debts').delete().eq('id', id)
+  const { error } = await supabase.from('debts').delete().eq('id', id)
+
+  if (error) {
+    redirect(`/debts?error=${encodeURIComponent(`No se pudo eliminar: ${error.message}`)}`)
+  }
+
   revalidatePath('/debts')
 }

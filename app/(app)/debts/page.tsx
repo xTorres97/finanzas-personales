@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import type { Debt, DebtPayment } from '@/lib/types'
+import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { addDebt, addDebtPayment, deleteDebt } from './actions'
 
-export default async function DebtsPage() {
+export default async function DebtsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   const householdId = await getHouseholdId()
   const supabase = await createClient()
 
@@ -36,6 +42,12 @@ export default async function DebtsPage() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Deudas</h1>
         <p className="text-sm text-[var(--muted)]">Préstamos, compras a cuotas y lo que debas — con su historial de pagos.</p>
       </header>
+
+      {error && (
+        <p className="mb-6 rounded-lg px-3 py-2 text-sm" style={{ background: '#fbeae6', color: 'var(--negative)' }}>
+          {error}
+        </p>
+      )}
 
       <NewDebtForm />
 
@@ -117,9 +129,13 @@ function DebtCard({ debt, payments }: { debt: Debt; payments: DebtPayment[] }) {
         </div>
         <form action={deleteDebt}>
           <input type="hidden" name="id" value={debt.id} />
-          <button type="submit" className="text-xs" style={{ color: 'var(--negative)' }}>
+          <ConfirmDeleteButton
+            confirmMessage={`¿Eliminar la deuda "${debt.name}"? Se borra también su historial de pagos. No se puede deshacer.`}
+            className="text-xs"
+            style={{ color: 'var(--negative)' }}
+          >
             Eliminar
-          </button>
+          </ConfirmDeleteButton>
         </form>
       </div>
 

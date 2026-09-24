@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import type { GoalContribution, SavingsGoal } from '@/lib/types'
+import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { addGoal, addContribution, deleteGoal } from './actions'
 
-export default async function GoalsPage() {
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   const householdId = await getHouseholdId()
   const supabase = await createClient()
 
@@ -36,6 +42,12 @@ export default async function GoalsPage() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Metas de ahorro</h1>
         <p className="text-sm text-[var(--muted)]">Definí objetivos y llevá el progreso de cada uno.</p>
       </header>
+
+      {error && (
+        <p className="mb-6 rounded-lg px-3 py-2 text-sm" style={{ background: '#fbeae6', color: 'var(--negative)' }}>
+          {error}
+        </p>
+      )}
 
       <NewGoalForm />
 
@@ -120,9 +132,13 @@ function GoalCard({ goal, contributions }: { goal: SavingsGoal; contributions: G
         </div>
         <form action={deleteGoal}>
           <input type="hidden" name="id" value={goal.id} />
-          <button type="submit" className="text-xs" style={{ color: 'var(--expense)' }}>
+          <ConfirmDeleteButton
+            confirmMessage={`¿Eliminar la meta "${goal.name}"? No se puede deshacer.`}
+            className="text-xs"
+            style={{ color: 'var(--expense)' }}
+          >
             Eliminar
-          </button>
+          </ConfirmDeleteButton>
         </form>
       </div>
 

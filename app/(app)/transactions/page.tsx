@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import { TransactionForm } from '@/components/transaction-form'
+import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteTransaction } from './actions'
 import type { Category, Subcategory, TransactionWithCategory } from '@/lib/types'
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   const householdId = await getHouseholdId()
   const supabase = await createClient()
 
@@ -29,6 +35,12 @@ export default async function TransactionsPage() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Movimientos</h1>
         <p className="text-sm text-[var(--muted)]">Cargá y revisá todos tus ingresos y gastos.</p>
       </header>
+
+      {error && (
+        <p className="mb-6 rounded-lg px-3 py-2 text-sm" style={{ background: '#fbeae6', color: 'var(--negative)' }}>
+          {error}
+        </p>
+      )}
 
       {cats.length === 0 ? (
         <p className="mb-8 rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
@@ -69,9 +81,13 @@ export default async function TransactionsPage() {
                   </p>
                   <form action={deleteTransaction}>
                     <input type="hidden" name="id" value={t.id} />
-                    <button type="submit" className="text-xs" style={{ color: 'var(--muted)' }}>
+                    <ConfirmDeleteButton
+                      confirmMessage="¿Eliminar este movimiento? No se puede deshacer."
+                      className="text-xs"
+                      style={{ color: 'var(--muted)' }}
+                    >
                       Eliminar
-                    </button>
+                    </ConfirmDeleteButton>
                   </form>
                 </div>
               </li>

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 
@@ -41,7 +42,16 @@ export async function deleteCategory(formData: FormData) {
   // Las transacciones referencian category_id con FK sin cascade, así que
   // si tiene movimientos asociados, Postgres va a rechazar el delete —
   // es el comportamiento correcto (evita perder historial sin querer).
-  await supabase.from('categories').delete().eq('id', id)
+  const { error } = await supabase.from('categories').delete().eq('id', id)
+
+  if (error) {
+    const message =
+      error.code === '23503'
+        ? 'No se puede eliminar: esa categoría ya tiene movimientos cargados.'
+        : `No se pudo eliminar: ${error.message}`
+    redirect(`/categories?error=${encodeURIComponent(message)}`)
+  }
+
   revalidatePath('/categories')
 }
 
@@ -72,6 +82,15 @@ export async function deleteSubcategory(formData: FormData) {
   if (!id) return
 
   const supabase = await createClient()
-  await supabase.from('subcategories').delete().eq('id', id)
+  const { error } = await supabase.from('subcategories').delete().eq('id', id)
+
+  if (error) {
+    const message =
+      error.code === '23503'
+        ? 'No se puede eliminar: esa subcategoría ya tiene movimientos cargados.'
+        : `No se pudo eliminar: ${error.message}`
+    redirect(`/categories?error=${encodeURIComponent(message)}`)
+  }
+
   revalidatePath('/categories')
 }
