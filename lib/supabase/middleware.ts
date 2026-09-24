@@ -51,7 +51,13 @@ export async function updateSession(request: NextRequest) {
   const isLoginRoute = request.nextUrl.pathname.startsWith('/login')
   const isPublicRoute = isLoginRoute || request.nextUrl.pathname.startsWith('/join')
 
-  if (!user && !isPublicRoute && !authCheckFailed) {
+  // Evidencia de que alguna vez hubo una sesión en este navegador: si no
+  // hay ni rastro de la cookie de auth de Supabase, no hay ambigüedad
+  // posible — no hay sesión, punto. authCheckFailed deja de aplicar acá.
+  const hasSessionCookie = request.cookies.getAll().some((c) => c.name.includes('-auth-token'))
+  const shouldFailOpen = authCheckFailed && hasSessionCookie
+
+  if (!user && !isPublicRoute && !shouldFailOpen) {
     const url = request.nextUrl.clone()
     const originalPath = url.pathname + url.search
     url.pathname = '/login'
@@ -60,10 +66,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (authCheckFailed) {
-    // No sabemos si hay sesión o no — dejamos pasar tal cual sin tocar
-    // headers de household. Si la sesión era válida, la página va a poder
-    // consultar Supabase igual (RLS usa el JWT directo, no esta llamada).
+  if (shouldFailOpen) {
+    // Hay cookie de sesión pero no pudimos validarla ahora (falla
+    // transitoria) — dejamos pasar en vez de forzar un logout. Los datos
+    // siguen protegidos por RLS en Supabase, que no depende de esta llamada.
     return response
   }
 
