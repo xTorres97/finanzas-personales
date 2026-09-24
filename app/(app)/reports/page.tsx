@@ -151,7 +151,7 @@ export default async function ReportsPage({
             <AnnualSummaryCards income={income} expenses={expenses} />
             <div className="mt-4">
               <a
-                href={`/transactions?from=${from}&to=${to}&label=${encodeURIComponent(rangeLabel)}`}
+                href={`/transactions/history?from=${from}&to=${to}&label=${encodeURIComponent(rangeLabel)}`}
                 className="inline-block rounded-lg border px-4 py-2 text-sm font-medium"
                 style={{ borderColor: 'var(--border)' }}
               >

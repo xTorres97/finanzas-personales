@@ -1,16 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import { TransactionForm } from '@/components/transaction-form'
-import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { deleteTransaction } from './actions'
+import { TransactionHistoryList } from '@/components/transaction-history-list'
 import type { Category, Subcategory, TransactionWithCategory } from '@/lib/types'
 
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; from?: string; to?: string; label?: string; all?: string }>
+  searchParams: Promise<{ error?: string }>
 }) {
-  const { error, from, to, label, all } = await searchParams
+  const { error } = await searchParams
   const householdId = await getHouseholdId()
   const supabase = await createClient()
 
@@ -19,29 +18,18 @@ export default async function TransactionsPage({
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
   const currentMonthLabel = now.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })
 
-  const showAll = all === '1'
-  const hasCustomRange = Boolean(from && to)
-
-  let query = supabase
-    .from('transactions')
-    .select('*, categories(name, type, color)')
-    .eq('household_id', householdId ?? '')
-    .order('date', { ascending: false })
-
-  let heading = `Historial de ${currentMonthLabel}`
-  if (showAll) {
-    heading = 'Historial completo'
-  } else if (hasCustomRange) {
-    query = query.gte('date', from!).lte('date', to!)
-    heading = label ? `Movimientos de ${label}` : 'Movimientos del período'
-  } else {
-    query = query.gte('date', startOfMonth).lte('date', endOfMonth)
-  }
-
   const [{ data: categories }, { data: subcategories }, { data: transactions }] = await Promise.all([
     supabase.from('categories').select('*').eq('household_id', householdId ?? '').order('type').order('sort_order'),
     supabase.from('subcategories').select('*').order('sort_order'),
-    query.returns<TransactionWithCategory[]>(),
+    supabase
+      .from('transactions')
+      .select('*, categories(name, type, color)')
+      .eq('household_id', householdId ?? '')
+      .gte('date', startOfMonth)
+      .lte('date', endOfMonth)
+      .order('date', { ascending: false })
+      .range(0, 9)
+      .returns<TransactionWithCategory[]>(),
   ])
 
   const cats: Category[] = categories ?? []
@@ -73,57 +61,12 @@ export default async function TransactionsPage({
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-medium">{heading}</h2>
-          {showAll || hasCustomRange ? (
-            <a href="/transactions" className="text-xs underline" style={{ color: 'var(--muted)' }}>
-              Ver solo este mes
-            </a>
-          ) : (
-            <a href="/transactions?all=1" className="text-xs underline" style={{ color: 'var(--muted)' }}>
-              Ver historial completo
-            </a>
-          )}
+          <h2 className="text-lg font-medium">Movimientos de {currentMonthLabel}</h2>
+          <a href="/transactions/history?all=1" className="text-xs underline" style={{ color: 'var(--muted)' }}>
+            Ver historial completo →
+          </a>
         </div>
-        {rows.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
-            No hay movimientos en este período.
-          </p>
-        ) : (
-          <ul className="divide-y overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
-            {rows.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {t.description || t.categories?.name || 'Sin descripción'}
-                  </p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {t.categories?.name} · {new Date(t.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    {t.currency === 'VES' && t.exchange_rate ? ` · Bs ${t.amount.toLocaleString('es-VE')} (tasa ${t.exchange_rate.toFixed(2)})` : ''}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <p
-                    className="text-sm font-semibold tabular-nums"
-                    style={{ color: t.categories?.type === 'ingreso' ? 'var(--positive)' : 'var(--negative)' }}
-                  >
-                    {t.categories?.type === 'ingreso' ? '+' : '−'}
-                    {t.amount_usd.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                  </p>
-                  <form action={deleteTransaction}>
-                    <input type="hidden" name="id" value={t.id} />
-                    <ConfirmDeleteButton
-                      confirmMessage="¿Eliminar este movimiento? No se puede deshacer."
-                      className="text-xs"
-                      style={{ color: 'var(--muted)' }}
-                    >
-                      Eliminar
-                    </ConfirmDeleteButton>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <TransactionHistoryList initial={rows} />
       </section>
     </main>
   )
