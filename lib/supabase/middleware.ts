@@ -25,20 +25,46 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  let authCheckFailed = false
+  try {
+    const {
+      data: { user: fetchedUser },
+      error,
+    } = await supabase.auth.getUser()
+
+    if (error) {
+      // Falla transitoria (red, rate limit, etc.) al validar la sesión: no
+      // forzamos un redirect a /login sobre una sesión que podría ser
+      // válida — dejamos pasar la request. Los datos siguen protegidos
+      // por RLS en Supabase, que no depende de esta llamada.
+      console.error('middleware auth.getUser() error:', error.message)
+      authCheckFailed = true
+    } else {
+      user = fetchedUser
+    }
+  } catch (err) {
+    console.error('middleware auth.getUser() threw:', err)
+    authCheckFailed = true
+  }
 
   const isLoginRoute = request.nextUrl.pathname.startsWith('/login')
   const isPublicRoute = isLoginRoute || request.nextUrl.pathname.startsWith('/join')
 
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicRoute && !authCheckFailed) {
     const url = request.nextUrl.clone()
     const originalPath = url.pathname + url.search
     url.pathname = '/login'
     url.search = ''
     url.searchParams.set('next', originalPath)
     return NextResponse.redirect(url)
+  }
+
+  if (authCheckFailed) {
+    // No sabemos si hay sesión o no — dejamos pasar tal cual sin tocar
+    // headers de household. Si la sesión era válida, la página va a poder
+    // consultar Supabase igual (RLS usa el JWT directo, no esta llamada).
+    return response
   }
 
   if (user && isLoginRoute) {
