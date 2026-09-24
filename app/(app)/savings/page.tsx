@@ -2,14 +2,33 @@ import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import { withdrawSavings } from './actions'
 
-interface SavingsTxRow {
+interface DepositRow {
   id: string
   amount_usd: number
   description: string | null
   date: string
+  category_id: string
   subcategory_id: string | null
-  categories: { type: 'ingreso' | 'gasto'; name: string } | null
+  categories: { name: string } | null
   subcategories: { name: string } | null
+}
+
+interface WithdrawalRow {
+  id: string
+  amount: number
+  created_at: string
+  category_id: string
+  subcategory_id: string | null
+  subcategories: { name: string } | null
+}
+
+interface HistoryItem {
+  id: string
+  date: string
+  label: string
+  bucketLabel: string
+  amount: number
+  kind: 'deposit' | 'withdrawal'
 }
 
 export default async function SavingsPage() {
@@ -18,55 +37,86 @@ export default async function SavingsPage() {
 
   const { data: savingsCategories } = await supabase
     .from('categories')
-    .select('id, name, type')
+    .select('id, name')
     .eq('household_id', householdId ?? '')
     .eq('is_savings', true)
+    .eq('type', 'gasto')
 
   const categoryIds = (savingsCategories ?? []).map((c) => c.id)
 
-  const { data: transactions } = categoryIds.length
-    ? await supabase
-        .from('transactions')
-        .select('id, amount_usd, description, date, subcategory_id, categories(type, name), subcategories(name)')
-        .in('category_id', categoryIds)
-        .order('date', { ascending: false })
-        .returns<SavingsTxRow[]>()
-    : { data: [] as SavingsTxRow[] }
+  const [{ data: deposits }, { data: withdrawals }] = categoryIds.length
+    ? await Promise.all([
+        supabase
+          .from('transactions')
+          .select('id, amount_usd, description, date, category_id, subcategory_id, categories(name), subcategories(name)')
+          .in('category_id', categoryIds)
+          .order('date', { ascending: false })
+          .returns<DepositRow[]>(),
+        supabase
+          .from('savings_withdrawals')
+          .select('id, amount, created_at, category_id, subcategory_id, subcategories(name)')
+          .in('category_id', categoryIds)
+          .order('created_at', { ascending: false })
+          .returns<WithdrawalRow[]>(),
+      ])
+    : [{ data: [] as DepositRow[] }, { data: [] as WithdrawalRow[] }]
 
-  const rows: SavingsTxRow[] = transactions ?? []
+  const depositRows = deposits ?? []
+  const withdrawalRows = withdrawals ?? []
 
-  // Neto por bucket (subcategoría, o "General" si no tiene)
-  const buckets = new Map<string, { label: string; subcategoryId: string | null; net: number }>()
-  for (const t of rows) {
-    const key = t.subcategory_id ?? '__general__'
-    const isDeposit = t.categories?.type === 'gasto'
-    const signed = isDeposit ? t.amount_usd : -t.amount_usd
+  // Neto por bucket (categoryId + subcategoryId, "General" si no tiene subcategoría)
+  const buckets = new Map<
+    string,
+    { label: string; categoryId: string; subcategoryId: string | null; net: number }
+  >()
+
+  for (const d of depositRows) {
+    const key = `${d.category_id}:${d.subcategory_id ?? '__general__'}`
     const existing = buckets.get(key)
-    if (existing) {
-      existing.net += signed
-    } else {
-      buckets.set(key, {
-        label: t.subcategories?.name ?? 'General',
-        subcategoryId: t.subcategory_id,
-        net: signed,
-      })
-    }
+    if (existing) existing.net += d.amount_usd
+    else buckets.set(key, { label: d.subcategories?.name ?? 'General', categoryId: d.category_id, subcategoryId: d.subcategory_id, net: d.amount_usd })
+  }
+  for (const w of withdrawalRows) {
+    const key = `${w.category_id}:${w.subcategory_id ?? '__general__'}`
+    const existing = buckets.get(key)
+    if (existing) existing.net -= w.amount
+    else buckets.set(key, { label: w.subcategories?.name ?? 'General', categoryId: w.category_id, subcategoryId: w.subcategory_id, net: -w.amount })
   }
 
   const breakdown = [...buckets.values()].sort((a, b) => b.net - a.net)
   const total = breakdown.reduce((s, b) => s + b.net, 0)
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
+  const history: HistoryItem[] = [
+    ...depositRows.map((d) => ({
+      id: `d-${d.id}`,
+      date: d.date,
+      label: d.description || d.categories?.name || 'Ahorro',
+      bucketLabel: d.subcategories?.name ?? 'General',
+      amount: d.amount_usd,
+      kind: 'deposit' as const,
+    })),
+    ...withdrawalRows.map((w) => ({
+      id: `w-${w.id}`,
+      date: w.created_at,
+      label: 'Retiro',
+      bucketLabel: w.subcategories?.name ?? 'General',
+      amount: w.amount,
+      kind: 'withdrawal' as const,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+
   return (
     <main className="content-width px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Ahorros</h1>
         <p className="text-sm text-[var(--muted)]">
-          Todo lo que cargaste en categorías marcadas como ahorro, separado del resto de tus gastos.
+          Todo lo que cargaste en categorías marcadas como ahorro, separado del resto de tus gastos. Los
+          retiros no afectan tu balance general — solo se restan de acá.
         </p>
       </header>
 
-      {categoryIds.length === 0 || rows.length === 0 ? (
+      {categoryIds.length === 0 || (depositRows.length === 0 && withdrawalRows.length === 0) ? (
         <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[var(--muted)]" style={{ borderColor: 'var(--border)' }}>
           Todavía no tenés movimientos en categorías de ahorro. Marcá una (o creá una nueva) desde Categorías.
         </p>
@@ -83,8 +133,9 @@ export default async function SavingsPage() {
             <h2 className="text-sm font-medium text-[var(--muted)]">Por subcategoría</h2>
             {breakdown.map((b) => {
               const pct = total > 0 ? Math.round((b.net / total) * 100) : 0
+              const key = `${b.categoryId}:${b.subcategoryId ?? '__general__'}`
               return (
-                <div key={b.subcategoryId ?? '__general__'} className="rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
+                <div key={key} className="rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
                   <div className="mb-1 flex items-baseline justify-between text-sm">
                     <span className="font-medium">{b.label}</span>
                     <span className="tabular-nums text-[var(--muted)]">
@@ -100,8 +151,8 @@ export default async function SavingsPage() {
 
                   {b.net > 0 && (
                     <form action={withdrawSavings} className="flex items-center gap-2">
+                      <input type="hidden" name="categoryId" value={b.categoryId} />
                       <input type="hidden" name="subcategoryId" value={b.subcategoryId ?? ''} />
-                      <input type="hidden" name="label" value={b.label} />
                       <input
                         name="amount"
                         type="number"
@@ -125,27 +176,23 @@ export default async function SavingsPage() {
           <div className="mt-6">
             <h2 className="mb-3 text-sm font-medium text-[var(--muted)]">Historial</h2>
             <ul className="divide-y overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
-              {rows.map((t) => {
-                const isDeposit = t.categories?.type === 'gasto'
-                return (
-                  <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{t.description || t.categories?.name}</p>
-                      <p className="text-xs text-[var(--muted)]">
-                        {t.subcategories?.name ?? 'General'} ·{' '}
-                        {new Date(t.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <p
-                      className="shrink-0 text-sm font-semibold tabular-nums"
-                      style={{ color: isDeposit ? 'var(--balance)' : 'var(--negative)' }}
-                    >
-                      {isDeposit ? '+' : '−'}
-                      {fmt(t.amount_usd)}
+              {history.map((h) => (
+                <li key={h.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{h.label}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {h.bucketLabel} · {new Date(h.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </p>
-                  </li>
-                )
-              })}
+                  </div>
+                  <p
+                    className="shrink-0 text-sm font-semibold tabular-nums"
+                    style={{ color: h.kind === 'deposit' ? 'var(--balance)' : 'var(--negative)' }}
+                  >
+                    {h.kind === 'deposit' ? '+' : '−'}
+                    {fmt(h.amount)}
+                  </p>
+                </li>
+              ))}
             </ul>
           </div>
         </>

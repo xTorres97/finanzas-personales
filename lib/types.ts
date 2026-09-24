@@ -13,6 +13,15 @@ export interface Category {
   is_debt: boolean
 }
 
+export interface SavingsWithdrawal {
+  id: string
+  household_id: string
+  category_id: string
+  subcategory_id: string | null
+  amount: number
+  created_at: string
+}
+
 export interface Debt {
   id: string
   household_id: string
