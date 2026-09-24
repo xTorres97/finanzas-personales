@@ -4,7 +4,12 @@ import { useMemo } from 'react'
 
 const COLORS = ['var(--positive)', 'var(--balance)', 'var(--cyan)', 'var(--negative)']
 
-export function GoalCelebration({ goalName }: { goalName: string }) {
+interface Props {
+  goalName: string
+  message: string
+}
+
+export function GoalCelebration({ goalName, message }: Props) {
   const pieces = useMemo(
     () =>
       Array.from({ length: 24 }, (_, i) => ({
@@ -36,7 +41,7 @@ export function GoalCelebration({ goalName }: { goalName: string }) {
         />
       ))}
       <p className="relative text-sm font-semibold" style={{ color: 'var(--cyan)' }}>
-        🎉 ¡Bien hecho! Meta lograda 🎉
+        {message}
       </p>
       <p className="relative text-xs text-[var(--muted)]">Completaste &quot;{goalName}&quot; — ¡FELICIDADES!</p>
 

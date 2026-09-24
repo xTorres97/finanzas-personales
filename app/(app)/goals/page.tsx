@@ -3,7 +3,23 @@ import { getHouseholdId } from '@/lib/get-household'
 import type { GoalContribution, SavingsGoal } from '@/lib/types'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { GoalCelebration } from '@/components/goal-celebration'
+import { getGoalIcon } from '@/lib/goal-icon'
 import { addGoal, addContribution, deleteGoal } from './actions'
+
+const CELEBRATION_PHRASES = [
+  '🎉 ¡Bien hecho! Meta lograda 🎉',
+  '🏆 ¡Lo lograste! Una meta menos 🏆',
+  '✨ ¡Meta cumplida! Seguí así ✨',
+  '🙌 ¡Excelente! Objetivo alcanzado 🙌',
+  '🎊 ¡Felicidades! Meta completada 🎊',
+  '💪 ¡Se hizo! Otra meta lograda 💪',
+  '🚀 ¡Meta despegada con éxito! 🚀',
+  '⭐ ¡Increíble! Ya la cumpliste ⭐',
+]
+
+function pickCelebrationPhrase(): string {
+  return CELEBRATION_PHRASES[Math.floor(Math.random() * CELEBRATION_PHRASES.length)]
+}
 
 export default async function GoalsPage({
   searchParams,
@@ -119,18 +135,22 @@ function NewGoalForm() {
 function GoalCard({ goal, contributions }: { goal: SavingsGoal; contributions: GoalContribution[] }) {
   const pct = goal.target_amount > 0 ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) : 0
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: goal.currency })
+  const Icon = getGoalIcon(goal.name)
 
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
-      {pct >= 100 && <GoalCelebration goalName={goal.name} />}
+      {pct >= 100 && <GoalCelebration goalName={goal.name} message={pickCelebrationPhrase()} />}
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div>
-          <p className="font-medium">{goal.name}</p>
-          {goal.target_date && (
-            <p className="text-xs text-[var(--muted)]">
-              Meta para {new Date(goal.target_date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
-            </p>
-          )}
+        <div className="flex items-start gap-2">
+          <Icon size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--cyan)' }} />
+          <div>
+            <p className="font-medium">{goal.name}</p>
+            {goal.target_date && (
+              <p className="text-xs text-[var(--muted)]">
+                Meta para {new Date(goal.target_date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+            )}
+          </div>
         </div>
         <form action={deleteGoal}>
           <input type="hidden" name="id" value={goal.id} />
