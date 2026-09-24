@@ -1,4 +1,4 @@
-export type CurrencyCode = 'USD' | 'VES'
+export type CurrencyCode = 'USD' | 'VES' | 'EUR'
 export type CategoryType = 'ingreso' | 'gasto'
 
 export interface Category {

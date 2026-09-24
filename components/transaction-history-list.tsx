@@ -49,6 +49,7 @@ export function TransactionHistoryList({ initial }: { initial: TransactionWithCa
               <p className="text-xs text-[var(--muted)]">
                 {t.categories?.name} · {new Date(t.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                 {t.currency === 'VES' && t.exchange_rate ? ` · Bs ${t.amount.toLocaleString('es-VE')} (tasa ${t.exchange_rate.toFixed(2)})` : ''}
+                {t.currency === 'EUR' && t.exchange_rate ? ` · €${t.amount.toLocaleString('es-VE')} (≈${t.exchange_rate.toFixed(4)} USD/EUR)` : ''}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-3">

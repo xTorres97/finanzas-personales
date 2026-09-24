@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { fetchBcvRate, toUsd } from '@/lib/exchange-rate'
+import { fetchBcvRate, fetchBcvEurRate, fetchBinanceP2PRate, vesToUsd, eurToUsd, type RateSource } from '@/lib/exchange-rate'
 import type { Category, CurrencyCode, Subcategory } from '@/lib/types'
 
 interface Props {
@@ -18,19 +18,45 @@ export function TransactionForm({ categories, subcategories, householdId }: Prop
   const [subcategoryId, setSubcategoryId] = useState('')
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState<CurrencyCode>('USD')
+  const [rateSource, setRateSource] = useState<RateSource>('bcv')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [bcvRate, setBcvRate] = useState<number | null>(null)
+
+  // Tasas: VES usa vesRate (según rateSource); EUR usa eurRate + usdRate (cruce)
+  const [vesRate, setVesRate] = useState<number | null>(null)
+  const [eurRate, setEurRate] = useState<number | null>(null)
+  const [usdRateForEur, setUsdRateForEur] = useState<number | null>(null)
+  const [rateError, setRateError] = useState<string | null>(null)
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (currency === 'VES' && bcvRate === null) {
-      fetchBcvRate()
-        .then((r) => setBcvRate(r.rate))
-        .catch(() => setError('No pudimos traer la tasa BCV. Probá de nuevo.'))
+    setRateError(null)
+
+    if (currency === 'VES') {
+      setVesRate(null)
+      const fetcher = rateSource === 'bcv' ? fetchBcvRate : fetchBinanceP2PRate
+      fetcher()
+        .then((r) => setVesRate(r.rate))
+        .catch(() =>
+          setRateError(
+            rateSource === 'bcv'
+              ? 'No pudimos traer la tasa BCV. Probá de nuevo.'
+              : 'No pudimos traer la tasa de Binance P2P (no es oficial, a veces falla). Probá con BCV o más tarde.'
+          )
+        )
+    } else if (currency === 'EUR') {
+      setEurRate(null)
+      setUsdRateForEur(null)
+      Promise.all([fetchBcvEurRate(), fetchBcvRate()])
+        .then(([eur, usd]) => {
+          setEurRate(eur.rate)
+          setUsdRateForEur(usd.rate)
+        })
+        .catch(() => setRateError('No pudimos traer la tasa BCV del euro. Probá de nuevo.'))
     }
-  }, [currency, bcvRate])
+  }, [currency, rateSource])
 
   const availableSubcategories = subcategories.filter((s) => s.category_id === categoryId)
 
@@ -43,15 +69,30 @@ export function TransactionForm({ categories, subcategories, householdId }: Prop
       setError('Ingresá un monto válido.')
       return
     }
-    if (currency === 'VES' && !bcvRate) {
-      setError('Esperando la tasa BCV, probá de nuevo en un segundo.')
-      return
+
+    let amountUsd: number
+    let exchangeRateToStore: number | null = null
+
+    if (currency === 'USD') {
+      amountUsd = numericAmount
+    } else if (currency === 'VES') {
+      if (!vesRate) {
+        setError('Esperando la tasa, probá de nuevo en un segundo.')
+        return
+      }
+      amountUsd = vesToUsd(numericAmount, vesRate)
+      exchangeRateToStore = vesRate
+    } else {
+      // EUR
+      if (!eurRate || !usdRateForEur) {
+        setError('Esperando las tasas, probá de nuevo en un segundo.')
+        return
+      }
+      amountUsd = eurToUsd(numericAmount, eurRate, usdRateForEur)
+      exchangeRateToStore = Number((eurRate / usdRateForEur).toFixed(4))
     }
 
     setSaving(true)
-    const amountUsd =
-      currency === 'USD' ? numericAmount : toUsd(numericAmount, 'VES', bcvRate!)
-
     const supabase = createClient()
     const { error: insertError } = await supabase.from('transactions').insert({
       household_id: householdId,
@@ -59,7 +100,7 @@ export function TransactionForm({ categories, subcategories, householdId }: Prop
       subcategory_id: subcategoryId || null,
       amount: numericAmount,
       currency,
-      exchange_rate: currency === 'VES' ? bcvRate : null,
+      exchange_rate: exchangeRateToStore,
       amount_usd: amountUsd,
       description: description || null,
       date,
@@ -133,13 +174,47 @@ export function TransactionForm({ categories, subcategories, householdId }: Prop
           >
             <option value="USD">USD</option>
             <option value="VES">VES</option>
+            <option value="EUR">EUR</option>
           </select>
         </Field>
       </div>
 
       {currency === 'VES' && (
+        <div className="space-y-1">
+          <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: 'var(--border)', width: 'fit-content' }}>
+            {(['bcv', 'binance'] as RateSource[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setRateSource(s)}
+                className="rounded-md px-2.5 py-1 text-xs"
+                style={
+                  s === rateSource
+                    ? { background: 'var(--foreground)', color: 'var(--background)' }
+                    : { color: 'var(--muted)' }
+                }
+              >
+                {s === 'bcv' ? 'BCV' : 'Binance P2P'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--muted)]">
+            {rateError
+              ? rateError
+              : vesRate
+                ? `Tasa ${rateSource === 'bcv' ? 'BCV' : 'Binance P2P'}: ${vesRate.toFixed(2)} Bs/USD`
+                : 'Buscando tasa…'}
+          </p>
+        </div>
+      )}
+
+      {currency === 'EUR' && (
         <p className="text-xs text-[var(--muted)]">
-          {bcvRate ? `Tasa BCV: ${bcvRate.toFixed(2)} Bs/USD` : 'Buscando tasa BCV…'}
+          {rateError
+            ? rateError
+            : eurRate && usdRateForEur
+              ? `Tasa BCV: ${eurRate.toFixed(2)} Bs/EUR (≈ ${(eurRate / usdRateForEur).toFixed(4)} USD/EUR)`
+              : 'Buscando tasas…'}
         </p>
       )}
 
@@ -163,7 +238,7 @@ export function TransactionForm({ categories, subcategories, householdId }: Prop
         />
       </Field>
 
-      {error && <p className="text-sm" style={{ color: 'var(--expense)' }}>{error}</p>}
+      {error && <p className="text-sm" style={{ color: 'var(--negative)' }}>{error}</p>}
 
       <button
         type="submit"

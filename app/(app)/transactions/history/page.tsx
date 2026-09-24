@@ -42,7 +42,7 @@ export default async function TransactionsHistoryPage({
           ← Volver a Movimientos
         </a>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{heading}</h1>
-        <p className="text-sm text-[var(--muted)]">Solo consulta, para cargar un movimiento nuevo, vuelve a Movimientos.</p>
+        <p className="text-sm text-[var(--muted)]">Solo consulta — para cargar un movimiento nuevo, volvé a Movimientos.</p>
       </header>
 
       {rows.length === 0 ? (
@@ -60,6 +60,7 @@ export default async function TransactionsHistoryPage({
                 <p className="text-xs text-[var(--muted)]">
                   {t.categories?.name} · {new Date(t.date).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                   {t.currency === 'VES' && t.exchange_rate ? ` · Bs ${t.amount.toLocaleString('es-VE')} (tasa ${t.exchange_rate.toFixed(2)})` : ''}
+                  {t.currency === 'EUR' && t.exchange_rate ? ` · €${t.amount.toLocaleString('es-VE')} (≈${t.exchange_rate.toFixed(4)} USD/EUR)` : ''}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
