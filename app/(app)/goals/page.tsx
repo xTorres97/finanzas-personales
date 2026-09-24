@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getHouseholdId } from '@/lib/get-household'
 import type { GoalContribution, SavingsGoal } from '@/lib/types'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
+import { GoalCelebration } from '@/components/goal-celebration'
 import { addGoal, addContribution, deleteGoal } from './actions'
 
 export default async function GoalsPage({
@@ -121,6 +122,7 @@ function GoalCard({ goal, contributions }: { goal: SavingsGoal; contributions: G
 
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
+      {pct >= 100 && <GoalCelebration goalName={goal.name} />}
       <div className="mb-2 flex items-center justify-between gap-2">
         <div>
           <p className="font-medium">{goal.name}</p>
