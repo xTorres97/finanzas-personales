@@ -34,6 +34,7 @@
   --positive: #15803d;
   --negative: #b91c1c;
   --balance: #b45309;
+  --cyan: #0e7490;
 
   color-scheme: light;
   padding-top: env(safe-area-inset-top, 0px);
@@ -57,6 +58,7 @@
     --positive: #4ade80;
     --negative: #f87171;
     --balance: #fbbf24;
+    --cyan: #22d3ee;
 
     color-scheme: dark;
   }
@@ -77,6 +79,7 @@
   --positive: #4ade80;
   --negative: #f87171;
   --balance: #fbbf24;
+  --cyan: #22d3ee;
 
   color-scheme: dark;
 }

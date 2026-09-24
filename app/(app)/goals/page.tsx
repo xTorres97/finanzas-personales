@@ -39,7 +39,7 @@ export default async function GoalsPage({
   return (
     <main className="content-width px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Metas de ahorro</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: 'var(--cyan)' }}>Metas de ahorro</h1>
         <p className="text-sm text-[var(--muted)]">Definí objetivos y llevá el progreso de cada uno.</p>
       </header>
 

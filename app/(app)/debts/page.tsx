@@ -39,8 +39,8 @@ export default async function DebtsPage({
   return (
     <main className="content-width px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Deudas</h1>
-        <p className="text-sm text-[var(--muted)]">Préstamos, compras a cuotas y lo que debas — con su historial de pagos.</p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: 'var(--negative)' }}>Deudas</h1>
+        <p className="text-sm text-[var(--muted)]">Préstamos, compras a cuotas y lo que debas, con su historial de pagos.</p>
       </header>
 
       {error && (
