@@ -1,20 +1,26 @@
 /**
- * Tasas de cambio para convertir movimientos en VES/EUR a su equivalente
- * en USD (la moneda "ancla" de la app).
+ * Tasas de referencia para convertir un monto en VES a su equivalente en
+ * USD (la moneda "ancla" de la app). Las tres funcionan igual: devuelven
+ * un número de "bolívares por unidad", y para convertir simplemente se
+ * divide el monto en VES por ese número — sin importar si la tasa viene
+ * del dólar oficial, del paralelo, o del euro (así se usa en Venezuela:
+ * el euro BCV funciona como una tercera referencia de conversión, no
+ * como una moneda en sí).
  *
- * Fuentes:
- * - BCV (dólar y euro oficiales) vía DolarAPI, gratis y sin API key:
- *   https://dolarapi.com/docs/venezuela/
- * - Binance P2P (USDT/VES) — NO es una API oficial de Binance, es el
- *   endpoint interno que usa su propia web (el mismo que usan varias
- *   herramientas de la comunidad). Puede fallar o cambiar sin aviso.
+ * Fuentes, todas vía DolarAPI (gratis, sin API key, mismo dominio):
+ * https://dolarapi.com/docs/venezuela/
+ * - BCV: dólar oficial
+ * - Paralelo: dólar no oficial (fuente: Yadio) — la referencia de
+ *   "mercado paralelo/calle" que la gente suele llamar indistintamente
+ *   "tasa Binance" o "tasa paralela"
+ * - Euro BCV: euro oficial, usado acá como tercera tasa de conversión
  *
- * Cache: localStorage por 1h, para no pegarle a las APIs en cada carga.
+ * Cache: localStorage por 1h, para no pegarle a la API en cada carga.
  */
 
 const DOLAR_BCV_URL = 'https://ve.dolarapi.com/v1/dolares/oficial'
+const DOLAR_PARALELO_URL = 'https://ve.dolarapi.com/v1/dolares/paralelo'
 const EURO_BCV_URL = 'https://ve.dolarapi.com/v1/euros/oficial'
-const BINANCE_P2P_URL = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search'
 
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hora
 
@@ -32,80 +38,40 @@ export interface ExchangeRate {
   fetchedAt: string
 }
 
-export type RateSource = 'bcv' | 'binance'
+export type RateSource = 'bcv' | 'paralelo' | 'euro'
+
+async function fetchDolarApi(url: string, cacheKey: string): Promise<ExchangeRate> {
+  const cached = readCache(cacheKey)
+  if (cached) return cached
+
+  const res = await fetch(url, { next: { revalidate: 3600 } })
+  if (!res.ok) throw new Error(`DolarAPI respondió ${res.status}`)
+  const data: DolarApiResponse = await res.json()
+
+  const result: ExchangeRate = { rate: data.promedio, fetchedAt: data.fechaActualizacion }
+  writeCache(cacheKey, result)
+  return result
+}
 
 /** Tasa oficial del dólar (BCV): cuántos VES por 1 USD. */
-export async function fetchBcvRate(): Promise<ExchangeRate> {
-  const cached = readCache('bcv_usd_rate_cache_v1')
-  if (cached) return cached
-
-  const res = await fetch(DOLAR_BCV_URL, { next: { revalidate: 3600 } })
-  if (!res.ok) throw new Error(`DolarAPI (USD) respondió ${res.status}`)
-  const data: DolarApiResponse = await res.json()
-
-  const result: ExchangeRate = { rate: data.promedio, fetchedAt: data.fechaActualizacion }
-  writeCache('bcv_usd_rate_cache_v1', result)
-  return result
+export function fetchBcvRate(): Promise<ExchangeRate> {
+  return fetchDolarApi(DOLAR_BCV_URL, 'bcv_usd_rate_cache_v1')
 }
 
-/** Tasa oficial del euro (BCV): cuántos VES por 1 EUR. */
-export async function fetchBcvEurRate(): Promise<ExchangeRate> {
-  const cached = readCache('bcv_eur_rate_cache_v1')
-  if (cached) return cached
-
-  const res = await fetch(EURO_BCV_URL, { next: { revalidate: 3600 } })
-  if (!res.ok) throw new Error(`DolarAPI (EUR) respondió ${res.status}`)
-  const data: DolarApiResponse = await res.json()
-
-  const result: ExchangeRate = { rate: data.promedio, fetchedAt: data.fechaActualizacion }
-  writeCache('bcv_eur_rate_cache_v1', result)
-  return result
+/** Tasa paralela del dólar (fuente: Yadio, vía DolarAPI): cuántos VES por 1 USD. */
+export function fetchParaleloRate(): Promise<ExchangeRate> {
+  return fetchDolarApi(DOLAR_PARALELO_URL, 'paralelo_rate_cache_v1')
 }
 
-/**
- * Tasa "paralela" de referencia vía Binance P2P: mediana de los primeros
- * 10 anuncios de USDT/VES. No oficial — si Binance bloquea o cambia el
- * endpoint, esto puede empezar a fallar; por eso siempre se usa con
- * try/catch en el componente que la llama.
- */
-export async function fetchBinanceP2PRate(): Promise<ExchangeRate> {
-  const cached = readCache('binance_p2p_rate_cache_v1')
-  if (cached) return cached
+/** Tasa oficial del euro (BCV), usada como tercera referencia de conversión. */
+export function fetchEuroBcvRate(): Promise<ExchangeRate> {
+  return fetchDolarApi(EURO_BCV_URL, 'bcv_eur_rate_cache_v1')
+}
 
-  const res = await fetch(BINANCE_P2P_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    },
-    body: JSON.stringify({
-      asset: 'USDT',
-      fiat: 'VES',
-      tradeType: 'SELL',
-      page: 1,
-      rows: 10,
-      payTypes: [],
-      publisherType: null,
-      merchantCheck: true,
-    }),
-  })
-
-  if (!res.ok) throw new Error(`Binance P2P respondió ${res.status}`)
-  const json = await res.json()
-
-  const prices: number[] = (json?.data ?? [])
-    .map((item: { adv?: { price?: string } }) => Number(item.adv?.price))
-    .filter((p: number) => !Number.isNaN(p))
-
-  if (prices.length === 0) throw new Error('Binance P2P no devolvió anuncios')
-
-  prices.sort((a, b) => a - b)
-  const mid = Math.floor(prices.length / 2)
-  const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid]
-
-  const result: ExchangeRate = { rate: median, fetchedAt: new Date().toISOString() }
-  writeCache('binance_p2p_rate_cache_v1', result)
-  return result
+export function fetchRateBySource(source: RateSource): Promise<ExchangeRate> {
+  if (source === 'bcv') return fetchBcvRate()
+  if (source === 'paralelo') return fetchParaleloRate()
+  return fetchEuroBcvRate()
 }
 
 function readCache(key: string): ExchangeRate | null {
@@ -130,12 +96,7 @@ function writeCache(key: string, value: ExchangeRate) {
   }
 }
 
-/** Convierte un monto en VES a USD, dada una tasa VES-por-USD (de cualquier fuente). */
-export function vesToUsd(amount: number, vesPerUsd: number): number {
-  return Number((amount / vesPerUsd).toFixed(2))
-}
-
-/** Convierte un monto en EUR a USD, cruzando las dos tasas BCV (VES/EUR ÷ VES/USD). */
-export function eurToUsd(amount: number, vesPerEur: number, vesPerUsd: number): number {
-  return Number(((amount * vesPerEur) / vesPerUsd).toFixed(2))
+/** Convierte un monto en VES a USD, dada cualquiera de las tres tasas de arriba. */
+export function toUsd(amount: number, rate: number): number {
+  return Number((amount / rate).toFixed(2))
 }
